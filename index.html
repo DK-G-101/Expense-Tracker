@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Expenses">
+  <meta name="description" content="Personal expense tracker — auto saves to Google Sheets">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>Expense Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #242424;
+      --surface3: #2e2e2e;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.14);
+      --text: #f0f0f0;
+      --text2: #999;
+      --text3: #666;
+      --accent: #00e5a0;
+      --accent-dim: rgba(0,229,160,0.12);
+      --accent-dim2: rgba(0,229,160,0.2);
+      --red: #ff5c5c;
+      --red-dim: rgba(255,92,92,0.12);
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100%;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      padding: 16px 20px 12px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .app-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text3);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 11px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--text3);
+      transition: all 0.3s;
+    }
+    .sync-status.syncing { color: var(--amber, #ffb547); border-color: rgba(255,181,71,0.3); }
+    .sync-status.synced  { color: var(--accent); border-color: rgba(0,229,160,0.3); }
+    .sync-status.error   { color: var(--red); border-color: rgba(255,92,92,0.3); }
+    .sync-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+    .sync-status.syncing .sync-dot { animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .header-today {
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+    }
+    .header-sub { font-size: 12px; color: var(--text3); margin-top: 1px; }
+
+    /* ── NAV ── */
+    .nav {
+      display: flex;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .nav-btn {
+      flex: 1; padding: 10px 4px 8px;
+      background: none; border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer; color: var(--text3);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px; font-weight: 500;
+      letter-spacing: 0.04em;
+      display: flex; flex-direction: column;
+      align-items: center; gap: 4px;
+      transition: all 0.15s;
+      text-transform: uppercase;
+    }
+    .nav-btn svg { width: 18px; height: 18px; stroke-width: 1.8; }
+    .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── SCREENS ── */
+    .screen { display: none; flex: 1; overflow-y: auto; padding: 16px; }
+    .screen.active { display: block; }
+    .screen::-webkit-scrollbar { display: none; }
+
+    /* ── FORM ── */
+    .form-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .form-row { margin-bottom: 16px; }
+    .form-row:last-child { margin-bottom: 0; }
+    .form-label {
+      font-size: 11px; font-weight: 500;
+      color: var(--text3);
+      text-transform: uppercase; letter-spacing: 0.07em;
+      margin-bottom: 8px; display: block;
+    }
+    .form-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px; padding: 11px 14px;
+      outline: none; transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    .form-input:focus { border-color: var(--accent); }
+    .form-input::placeholder { color: var(--text3); }
+    select.form-input option { background: #222; }
+    .amount-wrap { position: relative; }
+    .amount-sym {
+      position: absolute; left: 14px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--accent); font-size: 18px;
+      font-weight: 600; font-family: 'DM Mono', monospace;
+      pointer-events: none;
+    }
+    .amount-wrap .form-input {
+      padding-left: 32px;
+      font-family: 'DM Mono', monospace;
+      font-size: 22px; font-weight: 500;
+    }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+
+    /* ── CATEGORY CHIPS ── */
+    .cat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .cat-chip {
+      padding: 7px 12px; border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text2);
+      font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .cat-chip.selected {
+      background: var(--accent-dim2);
+      border-color: var(--accent); color: var(--accent);
+    }
+
+    .btn-save {
+      width: 100%; padding: 14px;
+      background: var(--accent); color: #000;
+      border: none; border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px; font-weight: 600;
+      cursor: pointer; margin-top: 4px;
+      transition: all 0.15s; letter-spacing: 0.02em;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-save:active { transform: scale(0.98); opacity: 0.9; }
+    .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── DASHBOARD ── */
+    .month-nav {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 16px;
+    }
+    .month-nav-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text2); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .month-nav-btn svg { width: 16px; height: 16px; stroke-width: 2; }
+    .month-label { font-size: 16px; font-weight: 600; color: var(--text); }
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+    }
+    .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .stat-val { font-size: 20px; font-weight: 600; font-family: 'DM Mono', monospace; color: var(--text); }
+    .stat-val.accent { color: var(--accent); }
+    .section-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 11px; font-weight: 600; color: var(--text3);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;
+    }
+    .cat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .cat-bar-row:last-child { margin-bottom: 0; }
+    .cat-bar-name { font-size: 12px; color: var(--text2); width: 80px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cat-bar-track { flex: 1; height: 5px; background: var(--surface3); border-radius: 3px; overflow: hidden; }
+    .cat-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s cubic-bezier(.4,0,.2,1); }
+    .cat-bar-amt { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--text2); width: 68px; text-align: right; flex-shrink: 0; }
+
+    /* ── EXPENSE ITEMS ── */
+    .exp-item {
+      display: flex; align-items: flex-start;
+      justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid var(--border); gap: 10px;
+    }
+    .exp-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .exp-item:first-child { padding-top: 0; }
+    .exp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+    .exp-body { flex: 1; min-width: 0; }
+    .exp-reason { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .exp-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+    .exp-cat-badge {
+      display: inline-block; font-size: 10px; padding: 2px 7px;
+      border-radius: 10px; background: var(--accent-dim);
+      color: var(--accent); margin-left: 6px; vertical-align: middle;
+    }
+    .exp-amt { font-size: 15px; font-weight: 600; font-family: 'DM Mono', monospace; color: var(--red); }
+
+    /* ── LIST ── */
+    .list-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .list-title { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.06em; }
+    .sheets-link-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--accent-dim); border: 1px solid rgba(0,229,160,0.25);
+      color: var(--accent); padding: 6px 12px;
+      border-radius: 20px; font-size: 12px; font-weight: 500;
+      cursor: pointer; text-decoration: none;
+    }
+    .sheets-link-btn svg { width: 13px; height: 13px; }
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--text3);
+    }
+    .empty-state svg { width: 40px; height: 40px; opacity: 0.3; margin-bottom: 12px; stroke-width: 1.2; }
+    .empty-state p { font-size: 14px; }
+
+    /* ── PENDING BADGE ── */
+    .pending-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; padding: 2px 7px; border-radius: 10px;
+      background: rgba(255,181,71,0.15); color: #ffb547;
+      margin-left: 6px; vertical-align: middle;
+    }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 90px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface3); border: 1px solid var(--border2);
+      color: var(--text); padding: 10px 18px; border-radius: 24px;
+      font-size: 13px; font-weight: 500;
+      opacity: 0; transition: all 0.25s;
+      white-space: nowrap; pointer-events: none; z-index: 100;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.success { border-color: rgba(0,229,160,0.3); color: var(--accent); }
+    .toast.error { border-color: rgba(255,92,92,0.3); color: var(--red); }
+
+    /* ── OFFLINE BANNER ── */
+    .offline-banner {
+      background: rgba(255,181,71,0.12); border-bottom: 1px solid rgba(255,181,71,0.2);
+      color: #ffb547; font-size: 12px; text-align: center;
+      padding: 6px; display: none;
+    }
+    .offline-banner.show { display: block; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div class="header">
+    <div class="header-top">
+      <span class="app-name">Expenses</span>
+      <div class="sync-status" id="sync-status">
+        <span class="sync-dot"></span>
+        <span id="sync-label">Ready</span>
+      </div>
+    </div>
+    <div class="header-today" id="header-today">₹0</div>
+    <div class="header-sub" id="header-sub">today's total</div>
+  </div>
+
+  <div class="offline-banner" id="offline-banner">
+    ⚠️ You're offline — expenses saved locally, will sync when back online
+  </div>
+
+  <nav class="nav">
+    <button class="nav-btn active" onclick="showScreen('add',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+      Add
+    </button>
+    <button class="nav-btn" onclick="showScreen('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="6" width="4" height="15"/><rect x="17" y="3" width="4" height="18"/></svg>
+      Summary
+    </button>
+    <button class="nav-btn" onclick="showScreen('list',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      History
+    </button>
+  </nav>
+
+  <!-- ADD SCREEN -->
+  <div class="screen active" id="screen-add">
+    <div class="form-card">
+      <div class="form-row">
+        <label class="form-label">Amount (₹)</label>
+        <div class="amount-wrap">
+          <span class="amount-sym">₹</span>
+          <input class="form-input" type="number" id="inp-amount" placeholder="0" min="0" step="1" inputmode="decimal">
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Reason</label>
+        <input class="form-input" type="text" id="inp-reason" placeholder="e.g. Lunch, Auto fare, Groceries...">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Category</label>
+        <div class="cat-chips" id="cat-chips">
+          <div class="cat-chip selected" data-cat="Food">🍛 Food</div>
+          <div class="cat-chip" data-cat="Transport">🚌 Transport</div>
+          <div class="cat-chip" data-cat="Groceries">🛒 Groceries</div>
+          <div class="cat-chip" data-cat="Shopping">🛍️ Shopping</div>
+          <div class="cat-chip" data-cat="Medical">💊 Medical</div>
+          <div class="cat-chip" data-cat="Bills">💡 Bills</div>
+          <div class="cat-chip" data-cat="Education">📚 Education</div>
+          <div class="cat-chip" data-cat="Entertainment">🎬 Entertainment</div>
+          <div class="cat-chip" data-cat="Other">📦 Other</div>
+        </div>
+      </div>
+      <div class="form-row-2">
+        <div>
+          <label class="form-label">Date</label>
+          <input class="form-input" type="date" id="inp-date">
+        </div>
+        <div>
+          <label class="form-label">Note (optional)</label>
+          <input class="form-input" type="text" id="inp-note" placeholder="Extra info">
+        </div>
+      </div>
+      <button class="btn-save" id="save-btn" onclick="addExpense()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:16px;height:16px;stroke-width:2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        Save & Sync to Sheets
+      </button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD SCREEN -->
+  <div class="screen" id="screen-dashboard">
+    <div class="month-nav">
+      <button class="month-nav-btn" onclick="changeMonth(-1)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="month-label" id="dash-month-label"></span>
+      <button class="month-nav-btn" onclick="changeMonth(1)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Total Spent</div><div class="stat-val accent" id="stat-total">₹0</div></div>
+      <div class="stat-card"><div class="stat-label">No. of Expenses</div><div class="stat-val" id="stat-count">0</div></div>
+      <div class="stat-card"><div class="stat-label">Daily Average</div><div class="stat-val" id="stat-avg">₹0</div></div>
+      <div class="stat-card"><div class="stat-label">Biggest Spend</div><div class="stat-val" id="stat-max">₹0</div></div>
+    </div>
+    <div class="section-card">
+      <div class="section-title">By Category</div>
+      <div id="cat-bars"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-title">Recent Entries</div>
+      <div id="dash-recent"></div>
+    </div>
+  </div>
+
+  <!-- LIST SCREEN -->
+  <div class="screen" id="screen-list">
+    <div class="list-header">
+      <span class="list-title">All Expenses</span>
+      <a class="sheets-link-btn" href="https://docs.google.com/spreadsheets/d/1vnt4PV8DzEFqIHvMePrgQ8S9YBUzSlD2wnu94XyLf64/edit" target="_blank">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Open in Sheets
+      </a>
+    </div>
+    <div class="section-card" id="list-container"></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ──
+const SHEET_ID  = '1vnt4PV8DzEFqIHvMePrgQ8S9YBUzSlD2wnu94XyLf64';
+const API_KEY   = 'AIzaSyAE9HQ7wjg8HJRI-RqEkCj_W7I-bGwPnqw';
+const SHEET_NAME = 'Sheet1';
+const DB_KEY    = 'joyboy_exp_v3';
+const PENDING_KEY = 'joyboy_pending_v3';
+
+// ── STATE ──
+let expenses  = [];
+let pending   = []; // expenses waiting to sync
+let dashMonth = new Date();
+let selectedCat = 'Food';
+let isSyncing = false;
+
+// ── STORAGE ──
+function loadData() {
+  try { expenses = JSON.parse(localStorage.getItem(DB_KEY) || '[]'); } catch(e) { expenses = []; }
+  try { pending  = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch(e) { pending = []; }
+}
+function saveLocal() {
+  localStorage.setItem(DB_KEY, JSON.stringify(expenses));
+  localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+}
+
+// ── SYNC STATUS UI ──
+function setSyncStatus(state, label) {
+  const el = document.getElementById('sync-status');
+  el.className = 'sync-status ' + state;
+  document.getElementById('sync-label').textContent = label;
+}
+
+// ── GOOGLE SHEETS: APPEND ROW ──
+async function appendToSheets(exp) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${SHEET_NAME}:append?valueInputOption=USER_ENTERED&key=${API_KEY}`;
+  const body = {
+    values: [[exp.date, exp.reason, exp.category, exp.amount, exp.note || '']]
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error?.message || 'Sheets API error');
+  }
+  return true;
+}
+
+// ── SYNC PENDING QUEUE ──
+async function syncPending() {
+  if (isSyncing || pending.length === 0 || !navigator.onLine) return;
+  isSyncing = true;
+  setSyncStatus('syncing', 'Syncing...');
+  const toSync = [...pending];
+  for (const exp of toSync) {
+    try {
+      await appendToSheets(exp);
+      pending = pending.filter(p => p.id !== exp.id);
+      saveLocal();
+    } catch(e) {
+      console.error('Sync failed for', exp.id, e);
+      break;
+    }
+  }
+  isSyncing = false;
+  if (pending.length === 0) {
+    setSyncStatus('synced', 'Synced ✓');
+    setTimeout(() => setSyncStatus('', 'Ready'), 3000);
+  } else {
+    setSyncStatus('error', `${pending.length} pending`);
+  }
+}
+
+// ── ADD EXPENSE ──
+async function addExpense() {
+  const amount = parseFloat(document.getElementById('inp-amount').value);
+  const reason = document.getElementById('inp-reason').value.trim();
+  const date   = document.getElementById('inp-date').value;
+  const note   = document.getElementById('inp-note').value.trim();
+  if (!amount || amount <= 0) { showToast('Enter a valid amount'); return; }
+  if (!reason) { showToast('Enter a reason'); return; }
+  if (!date)   { showToast('Pick a date'); return; }
+
+  const exp = { id: Date.now(), amount, reason, category: selectedCat, date, note };
+
+  // Save locally immediately
+  expenses.unshift(exp);
+  pending.push(exp);
+  saveLocal();
+
+  // Clear form
+  document.getElementById('inp-amount').value = '';
+  document.getElementById('inp-reason').value = '';
+  document.getElementById('inp-note').value = '';
+  document.getElementById('inp-amount').focus();
+  updateHeader();
+
+  if (navigator.onLine) {
+    setSyncStatus('syncing', 'Syncing...');
+    try {
+      await appendToSheets(exp);
+      pending = pending.filter(p => p.id !== exp.id);
+      saveLocal();
+      setSyncStatus('synced', 'Synced ✓');
+      showToast('Saved & synced to Sheets ✓', true);
+      setTimeout(() => setSyncStatus('', 'Ready'), 3000);
+    } catch(e) {
+      setSyncStatus('error', 'Sync failed');
+      showToast('Saved locally — will retry sync', false);
+      setTimeout(() => setSyncStatus('', `${pending.length} pending`), 3000);
+    }
+  } else {
+    setSyncStatus('error', `${pending.length} pending`);
+    showToast('Saved locally — will sync when online', false);
+  }
+}
+
+// ── CATEGORY CHIPS ──
+document.querySelectorAll('.cat-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    selectedCat = chip.dataset.cat;
+  });
+});
+
+// ── SCREENS ──
+function showScreen(id, btn) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'dashboard') renderDashboard();
+  if (id === 'list') renderList();
+}
+
+function setToday() {
+  document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
+}
+
+function updateHeader() {
+  const today = new Date().toISOString().split('T')[0];
+  const todayExps = expenses.filter(e => e.date === today);
+  const sum = todayExps.reduce((a, e) => a + e.amount, 0);
+  document.getElementById('header-today').textContent = '₹' + sum.toLocaleString('en-IN');
+  document.getElementById('header-sub').textContent = todayExps.length
+    ? `${todayExps.length} expense${todayExps.length > 1 ? 's' : ''} today`
+    : "today's total";
+}
+
+function changeMonth(dir) {
+  dashMonth = new Date(dashMonth.getFullYear(), dashMonth.getMonth() + dir, 1);
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const y = dashMonth.getFullYear(), m = dashMonth.getMonth();
+  document.getElementById('dash-month-label').textContent =
+    dashMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const filtered = expenses.filter(e => {
+    const d = new Date(e.date); return d.getFullYear() === y && d.getMonth() === m;
+  });
+  const total = filtered.reduce((a, e) => a + e.amount, 0);
+  const days  = new Date(y, m + 1, 0).getDate();
+  const max   = filtered.length ? Math.max(...filtered.map(e => e.amount)) : 0;
+  document.getElementById('stat-total').textContent = '₹' + total.toLocaleString('en-IN');
+  document.getElementById('stat-count').textContent = filtered.length;
+  document.getElementById('stat-avg').textContent   = '₹' + Math.round(total / days).toLocaleString('en-IN');
+  document.getElementById('stat-max').textContent   = '₹' + max.toLocaleString('en-IN');
+
+  const cats = {};
+  filtered.forEach(e => { cats[e.category] = (cats[e.category] || 0) + e.amount; });
+  const sorted = Object.entries(cats).sort((a, b) => b[1] - a[1]);
+  const topVal = sorted.length ? sorted[0][1] : 1;
+  const barsEl = document.getElementById('cat-bars');
+  barsEl.innerHTML = sorted.length
+    ? sorted.map(([cat, amt]) => `
+        <div class="cat-bar-row">
+          <span class="cat-bar-name">${cat}</span>
+          <div class="cat-bar-track"><div class="cat-bar-fill" style="width:${Math.round(amt/topVal*100)}%"></div></div>
+          <span class="cat-bar-amt">₹${amt.toLocaleString('en-IN')}</span>
+        </div>`).join('')
+    : '<p style="color:var(--text3);font-size:13px;text-align:center;padding:16px 0">No data this month</p>';
+
+  const recent = filtered.slice(0, 6);
+  document.getElementById('dash-recent').innerHTML = recent.length
+    ? recent.map(expItemHTML).join('')
+    : '<p style="color:var(--text3);font-size:13px;text-align:center;padding:16px 0">No entries this month</p>';
+}
+
+function renderList() {
+  const c = document.getElementById('list-container');
+  if (!expenses.length) {
+    c.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <p>No expenses yet.<br>Add your first one!</p></div>`;
+    return;
+  }
+  c.innerHTML = expenses.map(expItemHTML).join('');
+}
+
+function expItemHTML(e) {
+  const isPending = pending.some(p => p.id === e.id);
+  return `<div class="exp-item">
+    <div class="exp-dot"></div>
+    <div class="exp-body">
+      <div class="exp-reason">${e.reason}</div>
+      <div class="exp-meta">${formatDate(e.date)}<span class="exp-cat-badge">${e.category}</span>${isPending ? '<span class="pending-badge">⏳ pending</span>' : ''}${e.note ? ` · <span style="color:var(--text3)">${e.note}</span>` : ''}</div>
+    </div>
+    <div style="flex-shrink:0">
+      <span class="exp-amt">₹${e.amount.toLocaleString('en-IN')}</span>
+    </div>
+  </div>`;
+}
+
+function formatDate(s) {
+  return new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function showToast(msg, success = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (success ? ' success' : '');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── ONLINE / OFFLINE ──
+function updateOnlineStatus() {
+  const banner = document.getElementById('offline-banner');
+  if (navigator.onLine) {
+    banner.classList.remove('show');
+    syncPending();
+  } else {
+    banner.classList.add('show');
+    if (pending.length > 0) setSyncStatus('error', `${pending.length} pending`);
+  }
+}
+window.addEventListener('online',  updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// ── RETRY SYNC every 30 seconds ──
+setInterval(() => { if (navigator.onLine && pending.length > 0) syncPending(); }, 30000);
+
+// ── SERVICE WORKER ──
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+// ── INIT ──
+loadData();
+setToday();
+updateHeader();
+updateOnlineStatus();
+dashMonth = new Date();
+</script>
+</body>
+</html>
