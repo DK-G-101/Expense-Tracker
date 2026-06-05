@@ -461,23 +461,18 @@ function setSyncStatus(state, label) {
 async function appendToSheets(exp) {
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmO93hgeYzM4pRGRER1FhGHoDaeBQZi8mqyLDUyRnUpxB2sMT_CChL-FtcSsQsbPBzHg/exec";
 
-  const res = await fetch(SCRIPT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      date: exp.date,
-      reason: exp.reason,
-      category: exp.category,
-      amount: exp.amount,
-      note: exp.note || ""
-    })
-  });
+  const formData = new FormData();
+  formData.append("date", exp.date);
+  formData.append("reason", exp.reason);
+  formData.append("category", exp.category);
+  formData.append("amount", exp.amount);
+  formData.append("note", exp.note || "");
 
-  if (!res.ok) {
-    throw new Error("Failed to sync");
-  }
+  await fetch(SCRIPT_URL, {
+    method: "POST",
+    body: formData,
+    mode: "no-cors"
+  });
 
   return true;
 }
