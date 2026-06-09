@@ -456,7 +456,33 @@ function setSyncStatus(state, label) {
   el.className = 'sync-status ' + state;
   document.getElementById('sync-label').textContent = label;
 }
-loadExpensesFromSheet
+async function loadExpensesFromSheet() {
+
+  const SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbwmO93hgeYzM4pRGRER1FhGHoDaeBQZi8mqyLDUyRnUpxB2sMT_CChL-FtcSsQsbPBzHg/exec";
+
+  try {
+
+    const res = await fetch(SCRIPT_URL);
+    const rows = await res.json();
+
+    expenses = rows.slice(1).map((r, index) => ({
+      id: index + 1,
+      date: r[0].split("T")[0],
+      reason: r[1],
+      category: r[2],
+      amount: Number(r[3]),
+      note: r[4] || ""
+    }));
+
+    updateHeader();
+    renderDashboard();
+    renderList();
+
+  } catch(err) {
+    console.error("Sheet Load Error:", err);
+  }
+}
 // ── GOOGLE SHEETS: APPEND ROW ──
 async function appendToSheets(exp) {
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmO93hgeYzM4pRGRER1FhGHoDaeBQZi8mqyLDUyRnUpxB2sMT_CChL-FtcSsQsbPBzHg/exec";
