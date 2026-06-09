@@ -456,7 +456,25 @@ function setSyncStatus(state, label) {
   el.className = 'sync-status ' + state;
   document.getElementById('sync-label').textContent = label;
 }
+async function loadExpensesFromSheet() {
 
+  const SCRIPT_URL =
+    "YOUR_APPS_SCRIPT_URL";
+
+  try {
+
+    const res = await fetch(SCRIPT_URL);
+
+    expenses = await res.json();
+
+    renderList();
+    renderDashboard();
+    updateHeader();
+
+  } catch(err) {
+    console.error(err);
+  }
+}
 // ── GOOGLE SHEETS: APPEND ROW ──
 async function appendToSheets(exp) {
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmO93hgeYzM4pRGRER1FhGHoDaeBQZi8mqyLDUyRnUpxB2sMT_CChL-FtcSsQsbPBzHg/exec";
@@ -534,6 +552,7 @@ async function addExpense() {
       saveLocal();
       setSyncStatus('synced', 'Synced ✓');
       showToast('Saved & synced to Sheets ✓', true);
+      await loadExpensesFromSheet();
       setTimeout(() => setSyncStatus('', 'Ready'), 3000);
     } catch(e) {
       setSyncStatus('error', 'Sync failed');
@@ -681,11 +700,12 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── INIT ──
-loadData();
+loadExpensesFromSheet();
 setToday();
-updateHeader();
 updateOnlineStatus();
 dashMonth = new Date();
+saveLocal();
+loadData();
 </script>
-</body>
+</body>      
 </html>
