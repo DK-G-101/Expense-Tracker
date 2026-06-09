@@ -456,25 +456,7 @@ function setSyncStatus(state, label) {
   el.className = 'sync-status ' + state;
   document.getElementById('sync-label').textContent = label;
 }
-async function loadExpensesFromSheet() {
-
-  const SCRIPT_URL =
-    "YOUR_APPS_SCRIPT_URL";
-
-  try {
-
-    const res = await fetch(SCRIPT_URL);
-
-    expenses = await res.json();
-
-    renderList();
-    renderDashboard();
-    updateHeader();
-
-  } catch(err) {
-    console.error(err);
-  }
-}
+loadExpensesFromSheet
 // ── GOOGLE SHEETS: APPEND ROW ──
 async function appendToSheets(exp) {
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmO93hgeYzM4pRGRER1FhGHoDaeBQZi8mqyLDUyRnUpxB2sMT_CChL-FtcSsQsbPBzHg/exec";
@@ -700,12 +682,12 @@ if ('serviceWorker' in navigator) {
 }
 
 // ── INIT ──
-loadExpensesFromSheet();
+loadData();
 setToday();
 updateOnlineStatus();
 dashMonth = new Date();
-saveLocal();
-loadData();
+
+loadExpensesFromSheet();
 </script>
 </body>      
 </html>
