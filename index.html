@@ -706,12 +706,12 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
-loadData();
+loadData();          // show cached data immediately
 setToday();
-updateOnlineStatus();
 dashMonth = new Date();
+updateOnlineStatus();
 
-loadExpensesFromSheet();
+loadExpensesFromSheet(); // then replace with latest Google Sheet data
 </script>
 </body>      
 </html>
