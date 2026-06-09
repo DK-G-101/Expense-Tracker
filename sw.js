@@ -16,18 +16,15 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Don't intercept Google Sheets API calls — they must go to network
-  if (e.request.url.includes('sheets.googleapis.com')) return;
+  if (e.request.url.includes('script.google.com')) return;
+
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (e.request.url.startsWith('http') && res.status === 200) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
+    fetch(e.request)
+      .then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, clone));
         return res;
-      });
-    }).catch(() => caches.match('/index.html'))
+      })
+      .catch(() => caches.match(e.request))
   );
 });
